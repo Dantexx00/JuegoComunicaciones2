@@ -13,4 +13,41 @@
 			ctx.fillText(data[i].number, data[i].x, data[i].y);
 		}
 	});
+	
+	document.onkeydown = function(event){
+		switch(event.keyCode){
+			case 68: //d
+				socket.emit('keyPress', {inputId:'right', state:true});
+				break;
+			case 83: //s
+				socket.emit('keyPress', {inputId:'down', state:true});
+				break;
+			case 65: //a
+				socket.emit('keyPress', {inputId:'left', state:true});
+				break;
+			case 87: //w
+				socket.emit('keyPress', {inputId:'up', state:true});
+				break;
+			default:
+				break;
+		};
+	}
+	document.onkeyup = function(event){
+		switch(event.keyCode){
+			case 68: //d
+				socket.emit('keyPress', {inputId:'right', state:false});
+				break;
+			case 83: //s
+				socket.emit('keyPress', {inputId:'down', state:false});
+				break;
+			case 65: //a
+				socket.emit('keyPress', {inputId:'left', state:false});
+				break;
+			case 87: //w
+				socket.emit('keyPress', {inputId:'up', state:false});
+				break;
+			default:
+				break;
+		};
+	}
 </script>
