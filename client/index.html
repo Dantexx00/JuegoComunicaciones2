@@ -3,14 +3,24 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js"></script>
 <script>
 	var ctx = document.getElementById("ctx").getContext("2d");
-	ctx.font = '30px Arial';
+	ctx.font = '15px Arial';
 	
 	var socket = io();
 	
+	var username = prompt("Ingresa tu nickname.");
+	
+	socket.emit('name', {name:username});
+	
+	var MAX_X_LENGHT = 500;
+	var MAX_Y_LENGHT = 500;
+	
 	socket.on('newPositions', function(data){
-		ctx.clearRect(0,0,500,500);
-		for(var i = 0; i < data.length; i++){
-			ctx.fillText(data[i].number, data[i].x, data[i].y);
+		ctx.clearRect(0,0,MAX_X_LENGHT,MAX_Y_LENGHT);
+		for(var i = 0; i < data.player.length; i++){
+			ctx.fillText(data.player[i].name, data.player[i].x, data.player[i].y + 20);
+		}
+		for(var j = 0; j < data.ball.length; j++){
+			ctx.fillRect(data.ball[j].x-5, data.ball[j].y-5, 10, 10);
 		}
 	});
 	
@@ -49,5 +59,20 @@
 			default:
 				break;
 		};
+	}
+	
+	document.onmousedown = function(event){
+		socket.emit('keyPress', {inputId:'attack', state:true});
+	}
+	
+	document.onmouseup = function(event){
+		socket.emit('keyPress', {inputId:'attack', state:false});
+	}
+	
+	document.onmousemove= function(event){
+		var x = -250 + event.clientX - 8;
+		var y = -250 + event.clientY - 8;
+		var angle = Math.atan2(y,x)/Math.PI * 180;
+		socket.emit('keyPress', {inputId:'mouseAngle', state:angle});
 	}
 </script>
