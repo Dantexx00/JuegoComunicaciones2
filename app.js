@@ -16,6 +16,8 @@ var MAX_WIDTH = 500;
 var MIN_WIDTH = 0;
 var MAX_HIGH = 500;
 var MIN_HIGH = 0;
+var BORDERX = 30;
+var BORDERY = 65;
 
 var SOCKET_LIST = {};
 
@@ -52,6 +54,7 @@ var Player = function(id){
 	self.mouseAngle = 0;
 	self.maxSpd = 10;
 	self.score = 0;
+	self.valid = false;
 	
 	var super_update = self.update;
 	self.update = function(){
@@ -70,7 +73,7 @@ var Player = function(id){
 	}
 	
 	self.updateSpd = function(){
-		if(self.pressingRight && self.x < MAX_WIDTH){
+		if(self.pressingRight && self.x < MAX_WIDTH - BORDERX){
 			self.spdX = self.maxSpd;
 		}
 		else if(self.pressingLeft && self.x > MIN_WIDTH){
@@ -79,10 +82,10 @@ var Player = function(id){
 		else{
 			self.spdX = 0;
 		}
-		if(self.pressingUp && self.y > MIN_HIGH){
+		if(self.pressingUp && self.y > MIN_HIGH + BORDERY){
 			self.spdY = -self.maxSpd;
 		}
-		else if(self.pressingDown && self.y < MAX_HIGH){
+		else if(self.pressingDown && self.y < MAX_HIGH - BORDERX){
 			self.spdY = self.maxSpd;
 		}
 		else{
@@ -91,12 +94,37 @@ var Player = function(id){
 	}
 	Player.list[id] = self;
 	
+	self.getInitPack = function(){
+		return {
+			id:self.id,
+			x:self.x,
+			y:self.y,
+			name:self.name,
+			valid:self.valid
+		};
+	}
+	
+	self.getUpdatePack = function(){
+		return {
+			id:self.id,
+			x:self.x,
+			y:self.y,
+			name:self.name,
+			valid:self.valid,
+			score:self.score
+		};
+	}
+	
+	initPack.player.push(self.getInitPack());
+	
 	return self;
 }
 
 Player.list = {};
 Player.onConnect = function(socket){
 	var player = Player(socket.id);
+	
+	socket.emit('playerId', {playerId:socket.id})
 	
 	socket.on('keyPress', function(data){
 		if(data.inputId === 'left'){
@@ -118,14 +146,19 @@ Player.onConnect = function(socket){
 			player.mouseAngle = data.state;
 		}
 	});
+	
 	socket.on('name', function(data){
 		player.name = data.name;
-		initPack.player.push({
-			id:player.id,
-			x:player.x,
-			y:player.y,
-			name:player.name
-		});
+		player.valid = true;
+		var players = [];
+		var balls = [];
+		for(var i in Player.list){
+			players.push(Player.list[i].getInitPack());
+		}
+		for(var i in Ball.list){
+			balls.push(Ball.list[i].getInitPack());
+		}
+		socket.emit('init', {player:players, ball: balls});
 	});
 }
 
@@ -139,13 +172,7 @@ Player.update = function(){
 	for(var i in Player.list){
 		var player = Player.list[i];
 		player.update();
-		pack.push({
-			id:player.id,
-			x:player.x,
-			y:player.y,
-			name:player.name,
-			score:player.score
-		});
+		pack.push(player.getUpdatePack());
 	}
 	return pack;
 }
@@ -153,6 +180,8 @@ Player.update = function(){
 var Ball = function(parent, angle){
 	var self = Entity();
 	self.id = Math.random();
+	self.x = parent.x;
+	self.y = parent.y;
 	self.spdX = Math.cos(angle/180*Math.PI)*10;
 	self.spdY = Math.sin(angle/180*Math.PI)*10;
 	self.parent = parent;
@@ -165,18 +194,31 @@ var Ball = function(parent, angle){
 		}
 		for(var i in Player.list){
 			var p = Player.list[i];
-			if(self.getDistance(p) < 32 && self.parent !== p.id){
+			if(self.getDistance(p) < 32 && self.parent !== p.id && p.valid){
 				self.toRemove = true;
 			}
 		}
 		super_update();
 	}
 	Ball.list[self.id] = self;
-	initPack.ball.push({
-		id:self.id,
-		x:self.x,
-		y:self.y
-	});
+	
+	self.getInitPack = function(){
+		return {
+			id:self.id,
+			x:self.x,
+			y:self.y
+		};
+	}
+	
+	self.getUpdatePack = function(){
+		return {
+			id:self.id,
+			x:self.x,
+			y:self.y
+		};
+	}
+	
+	initPack.ball.push(self.getInitPack());
 	return self;
 }
 
@@ -191,11 +233,9 @@ Ball.update = function(){
 			delete Ball.list[i];
 			removePack.ball.push(ball.id);
 		}
-		pack.push({
-			id:ball.id,
-			x:ball.x,
-			y:ball.y
-		});
+		else{
+			pack.push(ball.getUpdatePack());
+		}
 	}
 	return pack;
 }
@@ -226,4 +266,8 @@ setInterval(function(){
 		socket.emit('update', pack);
 		socket.emit('remove', removePack);
 	}
+	initPack.player = [];
+	initPack.ball = [];
+	removePack.player = [];
+	removePack.ball = [];
 }, 1000/25);
