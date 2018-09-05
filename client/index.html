@@ -2,27 +2,114 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js"></script>
 <script>
+	var username;
+	do{
+		username = prompt("Ingresa tu nickname.");
+	}while(username == null || username == '');
+		
 	var ctx = document.getElementById("ctx").getContext("2d");
-	ctx.font = '15px Arial';
+	ctx.font = '10px Arial';
 	
 	var socket = io();
 	
-	var username = prompt("Ingresa tu nickname.");
+	var Player = function(initPack){
+		var self = {};
+		self.id = initPack.id;
+		self.name = initPack.name;
+		self.x = initPack.x;
+		self.y = initPack.y;
+		self.score = initPack.score
+		
+		self.draw = function(){
+			
+			ctx.fillText(self.name, self.x, self.y - 40);
+			ctx.fillText("ptos:" + self.score, self.x, self.y + 25);
+		}
+		
+		Player.list[self.id] = self;
+		return self;
+	}
+	
+	var Ball = function(initPack){
+		var self = {};
+		self.id = initPack.id;
+		self.x = initPack.x;
+		self.y = initPack.y;
+		
+		self.draw = function(){
+			ctx.fillRect(self.x-5, self.y-5, 10, 10);
+		}
+		
+		Ball.list[self.id] = self;
+		return self;
+	}
+	
+	Ball.list = {};
+	
+	Player.list = {};
+	
+	socket.on('init', function(data){
+		for(var i = 0; i < data.player.length; i++){
+			new Player(data.player[i]);
+		}
+		for(var i = 0; i < data.ball.length; i++){
+			new Ball(data.ball[i]);
+		}
+	});
+	
+	socket.on('update', function(data){
+		for(var i = 0; i < data.player.length; i++){
+			var pack = data.player[i];
+			var p = Player.list[pack.id];
+			if(p){
+				if(pack.x != undefined){
+					p.x = pack.x;
+				}
+				if(pack.y != undefined){
+					p.y = pack.y;
+				}
+				if(pack.score != undefined){
+					p.score = pack.score;
+				}
+			}
+		}
+		for(var i = 0; i < data.ball.length; i++){
+			var pack = data.ball[i];
+			var b = Ball.list[pack.id];
+			if(b){
+				if(pack.x != undefined){
+					b.x = pack.x;
+				}
+				if(pack.y != undefined){
+					b.y = pack.y;
+				}
+			}
+		}
+	});
+	
+	socket.on('remove', function(data){
+		for(var i = 0; i < data.player.length; i++){
+			delete Player.list[data.player[i]];
+		}
+		for(var i = 0; i < data.ball.length; i++){
+			delete Ball.list[data.ball[i]];
+		}
+	});
 	
 	socket.emit('name', {name:username});
 	
 	var MAX_X_LENGHT = 500;
 	var MAX_Y_LENGHT = 500;
 	
-	socket.on('newPositions', function(data){
-		ctx.clearRect(0,0,MAX_X_LENGHT,MAX_Y_LENGHT);
-		for(var i = 0; i < data.player.length; i++){
-			ctx.fillText(data.player[i].name, data.player[i].x, data.player[i].y + 20);
+	setInterval(function(){
+		ctx.clearRect(0, 0, 500, 500);
+		for(var i in Player.list){
+			Player.list[i].draw();
 		}
-		for(var j = 0; j < data.ball.length; j++){
-			ctx.fillRect(data.ball[j].x-5, data.ball[j].y-5, 10, 10);
+		for(var i in Ball.list){
+			Ball.list[i].draw();
 		}
-	});
+	}, 40);
 	
 	document.onkeydown = function(event){
 		switch(event.keyCode){

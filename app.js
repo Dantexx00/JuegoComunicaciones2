@@ -12,12 +12,17 @@ app.use('/client', express.static(__dirname + '/client'));
 serv.listen(PORT);
 console.log('Server started');
 
+var MAX_WIDTH = 500;
+var MIN_WIDTH = 0;
+var MAX_HIGH = 500;
+var MIN_HIGH = 0;
+
 var SOCKET_LIST = {};
 
 var Entity = function(){
 	var self = {
-		x:250,
-		y:250,
+		x:MAX_WIDTH/2,
+		y:MAX_HIGH/2,
 		spdX:0,
 		spdY:0,
 		id:"",
@@ -45,7 +50,8 @@ var Player = function(id){
 	self.pressingUp = false;
 	self.pressingAttack = false;
 	self.mouseAngle = 0;
-	self.maxSpd = 10; 
+	self.maxSpd = 10;
+	self.score = 0;
 	
 	var super_update = self.update;
 	self.update = function(){
@@ -64,19 +70,19 @@ var Player = function(id){
 	}
 	
 	self.updateSpd = function(){
-		if(self.pressingRight){
+		if(self.pressingRight && self.x < MAX_WIDTH){
 			self.spdX = self.maxSpd;
 		}
-		else if(self.pressingLeft){
+		else if(self.pressingLeft && self.x > MIN_WIDTH){
 			self.spdX = -self.maxSpd;
 		}
 		else{
 			self.spdX = 0;
 		}
-		if(self.pressingUp){
+		if(self.pressingUp && self.y > MIN_HIGH){
 			self.spdY = -self.maxSpd;
 		}
-		else if(self.pressingDown){
+		else if(self.pressingDown && self.y < MAX_HIGH){
 			self.spdY = self.maxSpd;
 		}
 		else{
@@ -84,6 +90,7 @@ var Player = function(id){
 		}
 	}
 	Player.list[id] = self;
+	
 	return self;
 }
 
@@ -113,11 +120,18 @@ Player.onConnect = function(socket){
 	});
 	socket.on('name', function(data){
 		player.name = data.name;
+		initPack.player.push({
+			id:player.id,
+			x:player.x,
+			y:player.y,
+			name:player.name
+		});
 	});
 }
 
 Player.onDisconnect = function(socket){
 	delete Player.list[socket.id];
+	removePack.player.push(socket.id);
 }
 
 Player.update = function(){
@@ -126,9 +140,11 @@ Player.update = function(){
 		var player = Player.list[i];
 		player.update();
 		pack.push({
+			id:player.id,
 			x:player.x,
 			y:player.y,
-			name:player.name
+			name:player.name,
+			score:player.score
 		});
 	}
 	return pack;
@@ -156,6 +172,11 @@ var Ball = function(parent, angle){
 		super_update();
 	}
 	Ball.list[self.id] = self;
+	initPack.ball.push({
+		id:self.id,
+		x:self.x,
+		y:self.y
+	});
 	return self;
 }
 
@@ -168,8 +189,10 @@ Ball.update = function(){
 		ball.update();
 		if(ball.toRemove){
 			delete Ball.list[i];
+			removePack.ball.push(ball.id);
 		}
 		pack.push({
+			id:ball.id,
 			x:ball.x,
 			y:ball.y
 		});
@@ -189,6 +212,9 @@ io.sockets.on('connection', function(socket){
 	});
 });
 
+var initPack = {player:[], ball:[]};
+var removePack = {player:[], ball:[]};
+
 setInterval(function(){
 	var pack = {
 		player:Player.update(),
@@ -196,6 +222,8 @@ setInterval(function(){
 	}
 	for(var i in SOCKET_LIST){
 		var socket = SOCKET_LIST[i];
-		socket.emit('newPositions', pack);
+		socket.emit('init', initPack);
+		socket.emit('update', pack);
+		socket.emit('remove', removePack);
 	}
 }, 1000/25);
