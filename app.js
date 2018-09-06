@@ -12,12 +12,12 @@ app.use('/client', express.static(__dirname + '/client'));
 serv.listen(PORT);
 console.log('Server started');
 
-var MAX_WIDTH = 500;
+var MAX_WIDTH = 1300;
 var MIN_WIDTH = 0;
-var MAX_HIGH = 500;
+var MAX_HIGH = 550;
 var MIN_HIGH = 0;
-var BORDERX = 30;
-var BORDERY = 65;
+var BORDERX = 26;
+var BORDERY = 53;
 
 var SOCKET_LIST = {};
 
@@ -46,6 +46,8 @@ var Player = function(id){
 	var self = Entity();
 	self.id = id;
 	self.name = "";
+	self.x = Math.random() * MAX_WIDTH;
+	self.y = Math.random() * MAX_HIGH;
 	self.pressingRight = false;
 	self.pressingLeft = false;
 	self.pressingDown = false;
@@ -76,7 +78,7 @@ var Player = function(id){
 		if(self.pressingRight && self.x < MAX_WIDTH - BORDERX){
 			self.spdX = self.maxSpd;
 		}
-		else if(self.pressingLeft && self.x > MIN_WIDTH){
+		else if(self.pressingLeft && self.x > MIN_WIDTH + BORDERX){
 			self.spdX = -self.maxSpd;
 		}
 		else{
@@ -100,7 +102,8 @@ var Player = function(id){
 			x:self.x,
 			y:self.y,
 			name:self.name,
-			valid:self.valid
+			valid:self.valid,
+			score:self.score
 		};
 	}
 	
@@ -193,10 +196,23 @@ var Ball = function(parent, angle){
 			self.toRemove = true;
 		}
 		for(var i in Player.list){
-			var p = Player.list[i];
-			if(self.getDistance(p) < 32 && self.parent !== p.id && p.valid){
+			var t = Player.list[i];
+			if(self.getDistance(t) < 32 && t.id != self.parent){
 				self.toRemove = true;
+				t.score -= 1;
+				var p = Player.list[self.parent];
+				if(p){
+					p.score += 1;
+				}
+				if(t.score <= -100)
+				{
+					t.x = Math.random() * MAX_WIDTH;
+					t.y = Math.random() * MAX_HIGH;
+					t.score = 0;
+			
+				}
 			}
+			
 		}
 		super_update();
 	}
@@ -251,6 +267,8 @@ io.sockets.on('connection', function(socket){
 		Player.onDisconnect(socket);
 	});
 });
+
+
 
 var initPack = {player:[], ball:[]};
 var removePack = {player:[], ball:[]};
